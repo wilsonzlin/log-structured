@@ -151,17 +151,17 @@ impl<GC: GarbageChecker> LogStructured<GC> {
     loop {
       sleep(std::time::Duration::from_secs(10)).await;
 
-      let (orig_head, tail) = {
-        let state = self.log_state.lock().await;
-        (state.head, state.tail_on_disk)
-      };
-      let mut head = orig_head;
       // SAFETY:
       // - `head` is only ever modified by us so it's always what we expect.
       // - `tail` can be modified by others at any time but it only ever increases. If it physically reaches `head` (i.e. out of space), we panic.
       // - Data is never erased; only we can move the `head` to mark areas as free again but even then no data is written/cleared.
       // - Written log entries are never mutated/written to again, so we don't have to worry about other writers.
       // - Therefore, it's always safe to read from `head` to `tail`.
+      let (orig_head, tail) = {
+        let state = self.log_state.lock().await;
+        (state.head, state.tail_on_disk)
+      };
+      let mut head = orig_head;
       while head < tail {
         let physical_offset = self.physical_offset(head);
         let res = self.garbage_checker.check_offset(physical_offset).await;
