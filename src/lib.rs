@@ -79,7 +79,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
     self.device_offset + STATE_SIZE
   }
 
-  fn physical_offset(&self, virtual_offset: u64) -> u64 {
+  pub fn physical_offset(&self, virtual_offset: u64) -> u64 {
     self.reserved_size() + (virtual_offset % (self.device_size - self.reserved_size()))
   }
 
