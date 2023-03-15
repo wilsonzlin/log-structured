@@ -255,6 +255,11 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       .await;
   }
 
+  pub async fn get_head_and_tail(&self) -> (u64, u64) {
+    let log_state = self.log_state.lock().await;
+    (log_state.head, log_state.tail)
+  }
+
   pub async fn load_state_from_device(&self) {
     let head = self
       .device
