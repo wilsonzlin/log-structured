@@ -1,0 +1,18 @@
+[package]
+name = "log-structured"
+version = "0.1.0"
+edition = "2021"
+description = "Use log-structured storage"
+license = "Apache-2.0"
+homepage = "https://github.com/wilsonzlin/log-structured"
+repository = "https://github.com/wilsonzlin/log-structured.git"
+authors = ["Wilson Lin <code@wilsonl.in>"]
+
+[dependencies]
+async-trait = "0.1"
+futures = "0.3"
+off64 = "0.1"
+seekable-async-file = "0.4"
+signal-future = "0.0.1"
+tokio = "1"
+write-journal = "0.1"
