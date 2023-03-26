@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use futures::join;
+use off64::Off64Int;
 use seekable_async_file::SeekableAsyncFile;
 use signal_future::SignalFuture;
 use signal_future::SignalFutureController;
@@ -6,9 +8,9 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::join;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use write_journal::AtomicWriteGroup;
 use write_journal::WriteJournal;
 
 const STATE_OFFSETOF_HEAD: u64 = 0;
@@ -180,7 +182,10 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       if head != orig_head {
         self
           .journal
-          .write(STATE_OFFSETOF_HEAD, head.to_be_bytes().to_vec())
+          .write(AtomicWriteGroup(vec![(
+            STATE_OFFSETOF_HEAD,
+            head.to_be_bytes().to_vec(),
+          )]))
           .await;
         let mut state = self.log_state.lock().await;
         state.head = head;
@@ -218,10 +223,10 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       if let Some(new_tail_to_write) = new_tail_to_write {
         self
           .journal
-          .write(
+          .write(AtomicWriteGroup(vec![(
             STATE_OFFSETOF_TAIL,
             new_tail_to_write.to_be_bytes().to_vec(),
-          )
+          )]))
           .await;
 
         for ft in to_resolve {
@@ -263,12 +268,14 @@ impl<GC: GarbageChecker> LogStructured<GC> {
   pub async fn load_state_from_device(&self) {
     let head = self
       .device
-      .read_u64_at(self.device_offset + STATE_OFFSETOF_HEAD)
-      .await;
+      .read_at(self.device_offset + STATE_OFFSETOF_HEAD, 8)
+      .await
+      .read_u64_be_at(0);
     let tail = self
       .device
-      .read_u64_at(self.device_offset + STATE_OFFSETOF_TAIL)
-      .await;
+      .read_at(self.device_offset + STATE_OFFSETOF_TAIL, 8)
+      .await
+      .read_u64_be_at(0);
     self.free_space_gauge.store(tail - head, Ordering::Relaxed);
     {
       let mut log_state = self.log_state.lock().await;
