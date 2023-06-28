@@ -11,8 +11,8 @@ authors = ["Wilson Lin <code@wilsonl.in>"]
 [dependencies]
 async-trait = "0.1"
 futures = "0.3"
-off64 = "0.3"
-seekable-async-file = "0.5.3"
-signal-future = "0.0.1"
+off64 = "0.6.0"
+seekable-async-file = "0.11.2"
+signal-future = "0.1.1"
 tokio = "1"
-write-journal = "0.4.1"
+write-journal = "0.10.3"

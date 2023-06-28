@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::join;
-use off64::Off64Int;
+use off64::int::Off64ReadInt;
 use seekable_async_file::SeekableAsyncFile;
 use signal_future::SignalFuture;
 use signal_future::SignalFutureController;
@@ -10,7 +10,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use write_journal::AtomicWriteGroup;
 use write_journal::WriteJournal;
 
 const STATE_OFFSETOF_HEAD: u64 = 0;
@@ -180,13 +179,9 @@ impl<GC: GarbageChecker> LogStructured<GC> {
         };
       }
       if head != orig_head {
-        self
-          .journal
-          .write(AtomicWriteGroup(vec![(
-            STATE_OFFSETOF_HEAD,
-            head.to_be_bytes().to_vec(),
-          )]))
-          .await;
+        let mut txn = self.journal.begin_transaction();
+        txn.write(STATE_OFFSETOF_HEAD, head.to_be_bytes());
+        self.journal.commit_transaction(txn).await;
         let mut state = self.log_state.lock().await;
         state.head = head;
         self
@@ -221,16 +216,12 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       };
 
       if let Some(new_tail_to_write) = new_tail_to_write {
-        self
-          .journal
-          .write(AtomicWriteGroup(vec![(
-            STATE_OFFSETOF_TAIL,
-            new_tail_to_write.to_be_bytes().to_vec(),
-          )]))
-          .await;
+        let mut txn = self.journal.begin_transaction();
+        txn.write(STATE_OFFSETOF_TAIL, new_tail_to_write.to_be_bytes());
+        self.journal.commit_transaction(txn).await;
 
         for ft in to_resolve {
-          ft.signal();
+          ft.signal(());
         }
       };
     }
