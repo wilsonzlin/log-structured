@@ -180,7 +180,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       }
       if head != orig_head {
         let mut txn = self.journal.begin_transaction();
-        txn.write(STATE_OFFSETOF_HEAD, head.to_be_bytes());
+        txn.write(self.device_offset + STATE_OFFSETOF_HEAD, head.to_be_bytes());
         self.journal.commit_transaction(txn).await;
         let mut state = self.log_state.lock().await;
         state.head = head;
@@ -217,7 +217,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
 
       if let Some(new_tail_to_write) = new_tail_to_write {
         let mut txn = self.journal.begin_transaction();
-        txn.write(STATE_OFFSETOF_TAIL, new_tail_to_write.to_be_bytes());
+        txn.write(self.device_offset + STATE_OFFSETOF_TAIL, new_tail_to_write.to_be_bytes());
         self.journal.commit_transaction(txn).await;
 
         for ft in to_resolve {
