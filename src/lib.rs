@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::join;
 use off64::int::Off64ReadInt;
+use parking_lot::Mutex;
 use seekable_async_file::SeekableAsyncFile;
 use signal_future::SignalFuture;
 use signal_future::SignalFutureController;
@@ -8,7 +9,6 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::time::sleep;
 use write_journal::WriteJournal;
 
@@ -93,7 +93,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
     };
 
     let (physical_offset, new_tail, write_filler_at) = {
-      let mut state = self.log_state.lock().await;
+      let mut state = self.log_state.lock();
       let mut physical_offset = self.physical_offset(state.tail);
       let mut write_filler_at = None;
       if physical_offset + usage >= self.device_size {
@@ -137,7 +137,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
     let (fut, fut_ctl) = SignalFuture::new();
 
     {
-      let mut state = self.log_state.lock().await;
+      let mut state = self.log_state.lock();
 
       *state
         .pending_tail_bumps
@@ -159,7 +159,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       // - Written log entries are never mutated/written to again, so we don't have to worry about other writers.
       // - Therefore, it's always safe to read from `head` to `tail`.
       let (orig_head, tail) = {
-        let state = self.log_state.lock().await;
+        let state = self.log_state.lock();
         (state.head, state.tail_on_disk)
       };
       let mut head = orig_head;
@@ -182,7 +182,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
         let mut txn = self.journal.begin_transaction();
         txn.write(self.device_offset + STATE_OFFSETOF_HEAD, head.to_be_bytes());
         self.journal.commit_transaction(txn).await;
-        let mut state = self.log_state.lock().await;
+        let mut state = self.log_state.lock();
         state.head = head;
         self
           .free_space_gauge
@@ -198,7 +198,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       let mut to_resolve = vec![];
       let mut new_tail_to_write = None;
       {
-        let mut state = self.log_state.lock().await;
+        let mut state = self.log_state.lock();
         loop {
           let Some(e) = state.pending_tail_bumps.first_entry() else {
             break;
@@ -217,7 +217,10 @@ impl<GC: GarbageChecker> LogStructured<GC> {
 
       if let Some(new_tail_to_write) = new_tail_to_write {
         let mut txn = self.journal.begin_transaction();
-        txn.write(self.device_offset + STATE_OFFSETOF_TAIL, new_tail_to_write.to_be_bytes());
+        txn.write(
+          self.device_offset + STATE_OFFSETOF_TAIL,
+          new_tail_to_write.to_be_bytes(),
+        );
         self.journal.commit_transaction(txn).await;
 
         for ft in to_resolve {
@@ -251,8 +254,8 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       .await;
   }
 
-  pub async fn get_head_and_tail(&self) -> (u64, u64) {
-    let log_state = self.log_state.lock().await;
+  pub fn get_head_and_tail(&self) -> (u64, u64) {
+    let log_state = self.log_state.lock();
     (log_state.head, log_state.tail)
   }
 
@@ -269,7 +272,7 @@ impl<GC: GarbageChecker> LogStructured<GC> {
       .read_u64_be_at(0);
     self.free_space_gauge.store(tail - head, Ordering::Relaxed);
     {
-      let mut log_state = self.log_state.lock().await;
+      let mut log_state = self.log_state.lock();
       log_state.head = head;
       log_state.tail = tail;
     };

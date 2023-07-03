@@ -17,6 +17,7 @@ io_mmap = ["seekable-async-file/mmap", "write-journal/io_mmap"]
 async-trait = "0.1"
 futures = "0.3"
 off64 = "0.6.0"
+parking_lot = "0.12.1"
 seekable-async-file = { version = "0.11.3", default-features = false }
 signal-future = "0.1.1"
 tokio = "1"
